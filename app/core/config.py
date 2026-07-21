@@ -13,5 +13,7 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:5173"
 
+    slack_webhook_url: str = ""
+
 
 settings = Settings()
