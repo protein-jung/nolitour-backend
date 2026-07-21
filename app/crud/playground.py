@@ -33,11 +33,14 @@ def list_playgrounds(
     return list(db.execute(stmt).scalars().all())
 
 
-def create_user_playground(db: Session, data: PlaygroundCreate) -> Playground:
+def create_user_playground(
+    db: Session, data: PlaygroundCreate, *, submitted_by_id: uuid.UUID
+) -> Playground:
     playground = Playground(
         **data.model_dump(),
         source=PlaygroundSource.USER_SUBMITTED,
         is_verified=False,
+        submitted_by_id=submitted_by_id,
     )
     db.add(playground)
     db.commit()

@@ -15,5 +15,13 @@ class Settings(BaseSettings):
 
     slack_webhook_url: str = ""
 
+    jwt_secret_key: str = "dev-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    storage_backend: str = "local"  # local | s3 (s3 to be implemented later)
+    media_root: str = "media"
+    media_url_prefix: str = "/media"
+
 
 settings = Settings()

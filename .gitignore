@@ -11,5 +11,7 @@ venv/
 .DS_Store
 *.log
 
+media/
+
 .vscode/
 .idea/

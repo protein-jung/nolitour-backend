@@ -80,6 +80,10 @@ class Playground(Base):
     source_id: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 공공데이터 원본 고유번호
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    submitted_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow

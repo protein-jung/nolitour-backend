@@ -1,10 +1,13 @@
 import logging
 import traceback
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.auth import router as auth_router
 from app.api.routes.playgrounds import router as playgrounds_router
 from app.core.config import settings
 from app.core.slack import send_slack_alert
@@ -21,7 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+Path(settings.media_root).mkdir(parents=True, exist_ok=True)
+app.mount(settings.media_url_prefix, StaticFiles(directory=settings.media_root), name="media")
+
 app.include_router(playgrounds_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)
