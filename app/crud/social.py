@@ -3,7 +3,8 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.social import PlaygroundComment, PlaygroundLike
+from app.models.playground import AgeGroup
+from app.models.social import PlaygroundComment, PlaygroundLike, RiskTag
 
 
 def get_like_status(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID | None) -> tuple[int, bool]:
@@ -59,13 +60,38 @@ def list_comments(db: Session, playground_id: uuid.UUID) -> list[PlaygroundComme
 
 
 def create_comment(
-    db: Session, playground_id: uuid.UUID, user_id: uuid.UUID, content: str
+    db: Session,
+    playground_id: uuid.UUID,
+    user_id: uuid.UUID,
+    content: str,
+    *,
+    rating: int | None = None,
+    recommended_ages: list[AgeGroup] | None = None,
+    risk_tags: list[RiskTag] | None = None,
 ) -> PlaygroundComment:
-    comment = PlaygroundComment(playground_id=playground_id, user_id=user_id, content=content)
+    comment = PlaygroundComment(
+        playground_id=playground_id,
+        user_id=user_id,
+        content=content,
+        rating=rating,
+        recommended_ages=recommended_ages,
+        risk_tags=risk_tags,
+    )
     db.add(comment)
     db.commit()
     db.refresh(comment)
     return comment
+
+
+def get_rating_stats(db: Session, playground_id: uuid.UUID) -> tuple[float | None, int]:
+    row = db.execute(
+        select(func.avg(PlaygroundComment.rating), func.count(PlaygroundComment.rating)).where(
+            PlaygroundComment.playground_id == playground_id,
+            PlaygroundComment.rating.isnot(None),
+        )
+    ).one()
+    avg, count = row
+    return (round(float(avg), 1) if avg is not None else None), count
 
 
 def get_comment(db: Session, comment_id: uuid.UUID) -> PlaygroundComment | None:

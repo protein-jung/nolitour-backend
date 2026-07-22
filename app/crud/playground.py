@@ -80,3 +80,22 @@ def create_user_playground(
     db.commit()
     db.refresh(playground)
     return playground
+
+
+def list_playgrounds_for_admin(db: Session, *, is_verified: bool | None = None) -> list[Playground]:
+    stmt = select(Playground).order_by(Playground.created_at.desc())
+    if is_verified is not None:
+        stmt = stmt.where(Playground.is_verified == is_verified)
+    return list(db.execute(stmt).scalars().all())
+
+
+def verify_playground(db: Session, playground: Playground) -> Playground:
+    playground.is_verified = True
+    db.commit()
+    db.refresh(playground)
+    return playground
+
+
+def delete_playground(db: Session, playground: Playground) -> None:
+    db.delete(playground)
+    db.commit()

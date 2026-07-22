@@ -70,3 +70,5 @@ class PlaygroundOut(PlaygroundBase):
     like_count: int | None = None
     liked_by_me: bool | None = None
     comment_count: int | None = None
+    average_rating: float | None = None
+    rating_count: int | None = None

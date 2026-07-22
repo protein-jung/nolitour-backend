@@ -47,6 +47,7 @@ class UserOut(BaseModel):
     phone: str
     name: str
     nickname: str
+    is_admin: bool
 
 
 class LoginRequest(BaseModel):

@@ -21,6 +21,9 @@ def _comment_out(comment: PlaygroundComment) -> CommentOut:
     return CommentOut(
         id=comment.id,
         content=comment.content,
+        rating=comment.rating,
+        recommended_ages=comment.recommended_ages,
+        risk_tags=comment.risk_tags,
         created_at=comment.created_at,
         author_nickname=comment.author.nickname,
         author_id=comment.user_id,
@@ -78,11 +81,14 @@ def get_playground(
         db, playground_id, current_user.id if current_user else None
     )
     comment_count = len(social_crud.list_comments(db, playground_id))
+    average_rating, rating_count = social_crud.get_rating_stats(db, playground_id)
 
     out = PlaygroundOut.model_validate(playground)
     out.like_count = like_count
     out.liked_by_me = liked_by_me
     out.comment_count = comment_count
+    out.average_rating = average_rating
+    out.rating_count = rating_count
     return out
 
 
@@ -164,7 +170,15 @@ def post_comment(
 ):
     if crud.get_playground(db, playground_id) is None:
         raise HTTPException(status_code=404, detail="Playground not found")
-    comment = social_crud.create_comment(db, playground_id, current_user.id, data.content)
+    comment = social_crud.create_comment(
+        db,
+        playground_id,
+        current_user.id,
+        data.content,
+        rating=data.rating,
+        recommended_ages=data.recommended_ages,
+        risk_tags=data.risk_tags,
+    )
     return _comment_out(comment)
 
 

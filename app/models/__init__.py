@@ -11,5 +11,5 @@ from app.models.playground import (  # noqa: F401
     ShadeLevel,
     SurfaceType,
 )
-from app.models.social import PlaygroundComment, PlaygroundLike  # noqa: F401
+from app.models.social import PlaygroundComment, PlaygroundLike, RiskTag  # noqa: F401
 from app.models.user import User  # noqa: F401

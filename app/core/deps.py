@@ -43,3 +43,9 @@ def get_current_user_optional(
     if not user_id:
         return None
     return db.get(User, uuid.UUID(user_id))
+
+
+def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자만 접근할 수 있습니다.")
+    return current_user
