@@ -12,10 +12,22 @@ from app.crud import user as user_crud
 from app.models.playground import Playground
 from app.models.social import PlaygroundComment
 from app.models.user import User
-from app.schemas.admin import AdminStats, AdminUserOut, AdminUserUpdate
+from app.schemas.admin import AdminStats, AdminUserOut, AdminUserUpdate, UserActivity, UserActivityComment
 from app.schemas.playground import PlaygroundOut
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin_user)])
+
+
+def _admin_user_out(user: User, playground_count: int) -> AdminUserOut:
+    return AdminUserOut(
+        id=user.id,
+        phone=user.phone,
+        name=user.name,
+        nickname=user.nickname,
+        is_admin=user.is_admin,
+        created_at=user.created_at,
+        playground_count=playground_count,
+    )
 
 
 @router.get("/stats", response_model=AdminStats)
@@ -76,18 +88,7 @@ def delete_comment(comment_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.get("/users", response_model=list[AdminUserOut])
 def list_users(db: Session = Depends(get_db)):
     rows = user_crud.list_users_for_admin(db)
-    return [
-        AdminUserOut(
-            id=u.id,
-            phone=u.phone,
-            name=u.name,
-            nickname=u.nickname,
-            is_admin=u.is_admin,
-            created_at=u.created_at,
-            playground_count=count,
-        )
-        for u, count in rows
-    ]
+    return [_admin_user_out(u, count) for u, count in rows]
 
 
 @router.patch("/users/{user_id}/admin", response_model=AdminUserOut)
@@ -98,12 +99,33 @@ def update_user_admin(user_id: uuid.UUID, data: AdminUserUpdate, db: Session = D
         raise HTTPException(status_code=404, detail="User not found")
     updated = user_crud.set_user_admin(db, user, data.is_admin)
     playground_count = len(crud.list_playgrounds_by_submitter(db, updated.id))
-    return AdminUserOut(
-        id=updated.id,
-        phone=updated.phone,
-        name=updated.name,
-        nickname=updated.nickname,
-        is_admin=updated.is_admin,
-        created_at=updated.created_at,
-        playground_count=playground_count,
+    return _admin_user_out(updated, playground_count)
+
+
+@router.get("/users/{user_id}/activity", response_model=UserActivity)
+def get_user_activity(user_id: uuid.UUID, db: Session = Depends(get_db)):
+    """회원 상세: 등록한 놀이터, 작성한 댓글·후기, 좋아요한 놀이터를 한번에 조회한다."""
+    user = user_crud.get_user(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    submitted = crud.list_playgrounds_by_submitter(db, user_id)
+    comments = social_crud.list_comments_by_user(db, user_id)
+    liked = social_crud.list_liked_playgrounds_by_user(db, user_id)
+
+    return UserActivity(
+        user=_admin_user_out(user, len(submitted)),
+        submitted_playgrounds=submitted,
+        comments=[
+            UserActivityComment(
+                id=c.id,
+                content=c.content,
+                rating=c.rating,
+                created_at=c.created_at,
+                playground_id=c.playground_id,
+                playground_name=name,
+            )
+            for c, name in comments
+        ],
+        liked_playgrounds=liked,
     )

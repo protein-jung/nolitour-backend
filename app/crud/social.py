@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.playground import AgeGroup
+from app.models.playground import AgeGroup, Playground
 from app.models.social import PlaygroundComment, PlaygroundLike, RiskTag
 
 
@@ -101,3 +101,24 @@ def get_comment(db: Session, comment_id: uuid.UUID) -> PlaygroundComment | None:
 def delete_comment(db: Session, comment: PlaygroundComment) -> None:
     db.delete(comment)
     db.commit()
+
+
+def list_comments_by_user(db: Session, user_id: uuid.UUID) -> list[tuple[PlaygroundComment, str]]:
+    """(댓글, 놀이터 이름) 목록을 최신순으로 반환한다."""
+    stmt = (
+        select(PlaygroundComment, Playground.name)
+        .join(Playground, Playground.id == PlaygroundComment.playground_id)
+        .where(PlaygroundComment.user_id == user_id)
+        .order_by(PlaygroundComment.created_at.desc())
+    )
+    return [(row[0], row[1]) for row in db.execute(stmt).all()]
+
+
+def list_liked_playgrounds_by_user(db: Session, user_id: uuid.UUID) -> list[Playground]:
+    stmt = (
+        select(Playground)
+        .join(PlaygroundLike, PlaygroundLike.playground_id == Playground.id)
+        .where(PlaygroundLike.user_id == user_id)
+        .order_by(PlaygroundLike.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars().all())
