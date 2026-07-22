@@ -31,3 +31,15 @@ def get_current_user(
     if not user:
         raise credentials_exception
     return user
+
+
+def get_current_user_optional(
+    token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not token:
+        return None
+    user_id = decode_access_token(token)
+    if not user_id:
+        return None
+    return db.get(User, uuid.UUID(user_id))

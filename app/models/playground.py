@@ -46,6 +46,61 @@ class PlaygroundSource(str, enum.Enum):
     USER_SUBMITTED = "user_submitted"
 
 
+class SurfaceType(str, enum.Enum):
+    """바닥 재질 (복수 선택 가능)"""
+
+    URETHANE = "urethane"  # 우레탄
+    SAND = "sand"  # 모래
+    GRASS = "grass"  # 잔디
+    RUBBER_CHIP = "rubber_chip"  # 고무칩
+    SOIL = "soil"  # 흙
+
+
+class ShadeLevel(str, enum.Enum):
+    """그늘 여부"""
+
+    SUFFICIENT = "sufficient"  # 충분함
+    MODERATE = "moderate"  # 보통
+    NONE = "none"  # 없음
+
+
+class RestroomType(str, enum.Enum):
+    """화장실"""
+
+    NONE = "none"  # 없음
+    AVAILABLE = "available"  # 있음
+    AVAILABLE_WITH_DIAPER_TABLE = "available_with_diaper_table"  # 기저귀 교환대 있음
+
+
+class ParkingType(str, enum.Enum):
+    """주차"""
+
+    NONE = "none"  # 없음
+    FREE = "free"  # 무료
+    PAID = "paid"  # 유료
+
+
+class FenceType(str, enum.Enum):
+    """펜스"""
+
+    FULL = "full"  # 완전 둘러짐
+    PARTIAL = "partial"  # 부분 있음
+    NONE = "none"  # 없음
+
+
+class EquipmentType(str, enum.Enum):
+    """놀이기구 (복수 선택 가능)"""
+
+    SLIDE = "slide"  # 미끄럼틀
+    SWING = "swing"  # 그네
+    SEESAW = "seesaw"  # 시소
+    ZIPLINE = "zipline"  # 집라인
+    SAND_PLAY = "sand_play"  # 모래놀이
+    TRAMPOLINE = "trampoline"  # 트램펄린
+    CLIMBING = "climbing"  # 클라이밍
+    WATER_PLAY = "water_play"  # 물놀이
+
+
 class Playground(Base):
     __tablename__ = "playgrounds"
 
@@ -71,6 +126,30 @@ class Playground(Base):
     operating_hours: Mapped[str | None] = mapped_column(String(200), nullable=True)
     closed_days: Mapped[str | None] = mapped_column(String(200), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # 안전 정보
+    surface_types: Mapped[list[SurfaceType] | None] = mapped_column(
+        ARRAY(Enum(SurfaceType, name="surface_type")), nullable=True
+    )
+    shade_level: Mapped[ShadeLevel | None] = mapped_column(
+        Enum(ShadeLevel, name="shade_level"), nullable=True
+    )
+    restroom: Mapped[RestroomType | None] = mapped_column(
+        Enum(RestroomType, name="restroom_type"), nullable=True
+    )
+    parking: Mapped[ParkingType | None] = mapped_column(
+        Enum(ParkingType, name="parking_type"), nullable=True
+    )
+    has_water_fountain: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_cctv: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    fence: Mapped[FenceType | None] = mapped_column(Enum(FenceType, name="fence_type"), nullable=True)
+    stroller_accessible: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    wheelchair_accessible: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # 놀이기구
+    equipment: Mapped[list[EquipmentType] | None] = mapped_column(
+        ARRAY(Enum(EquipmentType, name="equipment_type")), nullable=True
+    )
 
     source: Mapped[PlaygroundSource] = mapped_column(
         Enum(PlaygroundSource, name="playground_source"),
