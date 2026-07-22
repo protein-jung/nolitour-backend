@@ -12,7 +12,7 @@ from app.models.playground import AgeGroup, EquipmentType, PlaygroundImage
 from app.models.social import PlaygroundComment
 from app.models.user import User
 from app.schemas.playground import PlaygroundCreate, PlaygroundImageOut, PlaygroundOut
-from app.schemas.social import CommentCreate, CommentOut, LikeStatus
+from app.schemas.social import CommentCreate, CommentImageOut, CommentOut, LikeStatus
 
 router = APIRouter(prefix="/playgrounds", tags=["playgrounds"])
 
@@ -27,6 +27,7 @@ def _comment_out(comment: PlaygroundComment) -> CommentOut:
         created_at=comment.created_at,
         author_nickname=comment.author.nickname,
         author_id=comment.user_id,
+        images=list(comment.images),
     )
 
 
@@ -180,6 +181,27 @@ def post_comment(
         risk_tags=data.risk_tags,
     )
     return _comment_out(comment)
+
+
+@router.post(
+    "/{playground_id}/comments/{comment_id}/images", response_model=CommentImageOut, status_code=201
+)
+def upload_comment_image(
+    playground_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """후기 작성자가 후기에 사진을 추가한다."""
+    comment = social_crud.get_comment(db, comment_id)
+    if comment is None or comment.playground_id != playground_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="본인 후기에만 사진을 추가할 수 있습니다.")
+
+    image_url = get_storage_backend().save(file, folder=f"comments/{comment_id}")
+    return social_crud.add_comment_image(db, comment_id, image_url)
 
 
 @router.delete("/{playground_id}/comments/{comment_id}", status_code=204)

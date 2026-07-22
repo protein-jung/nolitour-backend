@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.playground import AgeGroup, Playground
-from app.models.social import PlaygroundComment, PlaygroundLike, RiskTag
+from app.models.social import PlaygroundComment, PlaygroundCommentImage, PlaygroundLike, RiskTag
 
 
 def get_like_status(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID | None) -> tuple[int, bool]:
@@ -120,5 +120,24 @@ def list_liked_playgrounds_by_user(db: Session, user_id: uuid.UUID) -> list[Play
         .join(PlaygroundLike, PlaygroundLike.playground_id == Playground.id)
         .where(PlaygroundLike.user_id == user_id)
         .order_by(PlaygroundLike.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def add_comment_image(db: Session, comment_id: uuid.UUID, image_url: str) -> PlaygroundCommentImage:
+    image = PlaygroundCommentImage(comment_id=comment_id, image_url=image_url)
+    db.add(image)
+    db.commit()
+    db.refresh(image)
+    return image
+
+
+def list_feed(db: Session, limit: int, offset: int) -> list[PlaygroundComment]:
+    """전체 놀이터의 댓글·후기를 최신순으로 반환한다 (피드용)."""
+    stmt = (
+        select(PlaygroundComment)
+        .order_by(PlaygroundComment.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(db.execute(stmt).scalars().all())

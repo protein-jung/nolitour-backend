@@ -29,6 +29,13 @@ class CommentCreate(BaseModel):
         return v
 
 
+class CommentImageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    image_url: str
+
+
 class CommentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,6 +47,7 @@ class CommentOut(BaseModel):
     created_at: datetime
     author_nickname: str
     author_id: uuid.UUID
+    images: list[CommentImageOut] = []
 
 
 class LikeStatus(BaseModel):
