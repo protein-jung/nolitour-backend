@@ -8,10 +8,11 @@ from app.core.database import get_db
 from app.core.deps import get_current_admin_user
 from app.crud import playground as crud
 from app.crud import social as social_crud
+from app.crud import user as user_crud
 from app.models.playground import Playground
 from app.models.social import PlaygroundComment
 from app.models.user import User
-from app.schemas.admin import AdminStats
+from app.schemas.admin import AdminStats, AdminUserOut, AdminUserUpdate
 from app.schemas.playground import PlaygroundOut
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin_user)])
@@ -35,7 +36,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 @router.get("/playgrounds", response_model=list[PlaygroundOut])
 def list_playgrounds(is_verified: bool | None = None, db: Session = Depends(get_db)):
-    """관리자용 놀이터 목록. is_verified=false 로 검수 대기 목록만 조회 가능."""
+    """관리자용 놀이터 목록. is_verified 생략 시 전체, true/false 로 필터링."""
     return crud.list_playgrounds_for_admin(db, is_verified=is_verified)
 
 
@@ -45,6 +46,14 @@ def verify_playground(playground_id: uuid.UUID, db: Session = Depends(get_db)):
     if playground is None:
         raise HTTPException(status_code=404, detail="Playground not found")
     return crud.verify_playground(db, playground)
+
+
+@router.patch("/playgrounds/{playground_id}/unverify", response_model=PlaygroundOut)
+def unverify_playground(playground_id: uuid.UUID, db: Session = Depends(get_db)):
+    playground = crud.get_playground(db, playground_id)
+    if playground is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+    return crud.unverify_playground(db, playground)
 
 
 @router.delete("/playgrounds/{playground_id}", status_code=204)
@@ -62,3 +71,39 @@ def delete_comment(comment_id: uuid.UUID, db: Session = Depends(get_db)):
     if comment is None:
         raise HTTPException(status_code=404, detail="Comment not found")
     social_crud.delete_comment(db, comment)
+
+
+@router.get("/users", response_model=list[AdminUserOut])
+def list_users(db: Session = Depends(get_db)):
+    rows = user_crud.list_users_for_admin(db)
+    return [
+        AdminUserOut(
+            id=u.id,
+            phone=u.phone,
+            name=u.name,
+            nickname=u.nickname,
+            is_admin=u.is_admin,
+            created_at=u.created_at,
+            playground_count=count,
+        )
+        for u, count in rows
+    ]
+
+
+@router.patch("/users/{user_id}/admin", response_model=AdminUserOut)
+def update_user_admin(user_id: uuid.UUID, data: AdminUserUpdate, db: Session = Depends(get_db)):
+    """다른 회원의 관리자 권한을 부여/해제한다 (이미 관리자만 호출 가능)."""
+    user = user_crud.get_user(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    updated = user_crud.set_user_admin(db, user, data.is_admin)
+    playground_count = len(crud.list_playgrounds_by_submitter(db, updated.id))
+    return AdminUserOut(
+        id=updated.id,
+        phone=updated.phone,
+        name=updated.name,
+        nickname=updated.nickname,
+        is_admin=updated.is_admin,
+        created_at=updated.created_at,
+        playground_count=playground_count,
+    )

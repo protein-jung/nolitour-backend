@@ -96,6 +96,13 @@ def verify_playground(db: Session, playground: Playground) -> Playground:
     return playground
 
 
+def unverify_playground(db: Session, playground: Playground) -> Playground:
+    playground.is_verified = False
+    db.commit()
+    db.refresh(playground)
+    return playground
+
+
 def delete_playground(db: Session, playground: Playground) -> None:
     db.delete(playground)
     db.commit()
