@@ -132,6 +132,12 @@ def add_comment_image(db: Session, comment_id: uuid.UUID, image_url: str) -> Pla
     return image
 
 
+def list_reviewed_playground_ids(db: Session, user_id: uuid.UUID) -> set[uuid.UUID]:
+    """사용자가 댓글·후기를 남긴 적 있는 놀이터 id 집합 (지도 퀘스트 완료 마커 표시용)"""
+    stmt = select(PlaygroundComment.playground_id).distinct().where(PlaygroundComment.user_id == user_id)
+    return set(db.execute(stmt).scalars().all())
+
+
 def list_feed(db: Session, limit: int, offset: int) -> list[PlaygroundComment]:
     """전체 놀이터의 댓글·후기를 최신순으로 반환한다 (피드용)."""
     stmt = (

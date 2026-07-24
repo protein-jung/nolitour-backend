@@ -43,9 +43,10 @@ def list_playgrounds(
     has_restroom: bool = False,
     equipment: list[EquipmentType] | None = Query(default=None),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """지도 bounding box + 필터 조건으로 놀이터 목록 조회"""
-    return crud.list_playgrounds(
+    playgrounds = crud.list_playgrounds(
         db,
         min_lat=min_lat,
         max_lat=max_lat,
@@ -57,6 +58,13 @@ def list_playgrounds(
         has_restroom=has_restroom,
         equipment=equipment,
     )
+    reviewed_ids = social_crud.list_reviewed_playground_ids(db, current_user.id) if current_user else set()
+    result = []
+    for p in playgrounds:
+        out = PlaygroundOut.model_validate(p)
+        out.reviewed_by_me = p.id in reviewed_ids
+        result.append(out)
+    return result
 
 
 @router.get("/mine", response_model=list[PlaygroundOut])
@@ -90,6 +98,8 @@ def get_playground(
     out.comment_count = comment_count
     out.average_rating = average_rating
     out.rating_count = rating_count
+    if current_user:
+        out.reviewed_by_me = playground_id in social_crud.list_reviewed_playground_ids(db, current_user.id)
     return out
 
 

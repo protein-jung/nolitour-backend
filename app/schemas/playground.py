@@ -72,3 +72,6 @@ class PlaygroundOut(PlaygroundBase):
     comment_count: int | None = None
     average_rating: float | None = None
     rating_count: int | None = None
+
+    # 로그인한 사용자가 후기를 남긴 적 있는 놀이터인지 (목록·단건 조회 모두에서 채워짐, 퀘스트 완료 마커 표시용)
+    reviewed_by_me: bool = False
