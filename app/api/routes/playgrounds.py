@@ -5,14 +5,23 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, get_current_user_optional
+from app.core.geo import haversine_distance_m
 from app.core.storage import get_storage_backend
 from app.crud import playground as crud
 from app.crud import social as social_crud
 from app.models.playground import AgeGroup, EquipmentType, PlaygroundImage
 from app.models.social import PlaygroundComment
 from app.models.user import User
-from app.schemas.playground import PlaygroundCreate, PlaygroundImageOut, PlaygroundOut
+from app.schemas.playground import (
+    PlaygroundCreate,
+    PlaygroundImageOut,
+    PlaygroundOut,
+    VisitCheckIn,
+    VisitResult,
+)
 from app.schemas.social import CommentCreate, CommentImageOut, CommentOut, LikeStatus
+
+VISIT_RADIUS_M = 300
 
 router = APIRouter(prefix="/playgrounds", tags=["playgrounds"])
 
@@ -59,10 +68,12 @@ def list_playgrounds(
         equipment=equipment,
     )
     reviewed_ids = social_crud.list_reviewed_playground_ids(db, current_user.id) if current_user else set()
+    visited_ids = social_crud.list_visited_playground_ids(db, current_user.id) if current_user else set()
     result = []
     for p in playgrounds:
         out = PlaygroundOut.model_validate(p)
         out.reviewed_by_me = p.id in reviewed_ids
+        out.visited_by_me = p.id in visited_ids
         result.append(out)
     return result
 
@@ -100,6 +111,7 @@ def get_playground(
     out.rating_count = rating_count
     if current_user:
         out.reviewed_by_me = playground_id in social_crud.list_reviewed_playground_ids(db, current_user.id)
+        out.visited_by_me = playground_id in social_crud.list_visited_playground_ids(db, current_user.id)
     return out
 
 
@@ -162,6 +174,31 @@ def unlike_playground(
     social_crud.unlike_playground(db, playground_id, current_user.id)
     like_count, liked_by_me = social_crud.get_like_status(db, playground_id, current_user.id)
     return LikeStatus(like_count=like_count, liked_by_me=liked_by_me)
+
+
+@router.post("/{playground_id}/visit", response_model=VisitResult, status_code=201)
+def check_in_playground(
+    playground_id: uuid.UUID,
+    data: VisitCheckIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """GPS 위치를 확인해 놀이터 근처에 있을 때만 '왔다감' 체크인을 기록한다."""
+    playground = crud.get_playground(db, playground_id)
+    if playground is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+
+    distance_m = haversine_distance_m(
+        data.latitude, data.longitude, playground.latitude, playground.longitude
+    )
+    if distance_m > VISIT_RADIUS_M:
+        raise HTTPException(
+            status_code=400,
+            detail=f"놀이터에서 {int(distance_m)}m 떨어져 있어요. {VISIT_RADIUS_M}m 이내에서 체크인할 수 있어요.",
+        )
+
+    social_crud.create_visit(db, playground_id, current_user.id)
+    return VisitResult(visited_by_me=True, distance_m=distance_m)
 
 
 @router.get("/{playground_id}/comments", response_model=list[CommentOut])

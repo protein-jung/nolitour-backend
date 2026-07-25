@@ -75,3 +75,15 @@ class PlaygroundOut(PlaygroundBase):
 
     # 로그인한 사용자가 후기를 남긴 적 있는 놀이터인지 (목록·단건 조회 모두에서 채워짐, 퀘스트 완료 마커 표시용)
     reviewed_by_me: bool = False
+    # 로그인한 사용자가 GPS로 '왔다감' 체크인한 놀이터인지 (목록·단건 조회 모두에서 채워짐)
+    visited_by_me: bool = False
+
+
+class VisitCheckIn(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class VisitResult(BaseModel):
+    visited_by_me: bool
+    distance_m: float

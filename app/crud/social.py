@@ -4,7 +4,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.playground import AgeGroup, Playground
-from app.models.social import PlaygroundComment, PlaygroundCommentImage, PlaygroundLike, RiskTag
+from app.models.social import (
+    PlaygroundComment,
+    PlaygroundCommentImage,
+    PlaygroundLike,
+    PlaygroundVisit,
+    RiskTag,
+)
+from app.models.user import User
 
 
 def get_like_status(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID | None) -> tuple[int, bool]:
@@ -136,6 +143,42 @@ def list_reviewed_playground_ids(db: Session, user_id: uuid.UUID) -> set[uuid.UU
     """사용자가 댓글·후기를 남긴 적 있는 놀이터 id 집합 (지도 퀘스트 완료 마커 표시용)"""
     stmt = select(PlaygroundComment.playground_id).distinct().where(PlaygroundComment.user_id == user_id)
     return set(db.execute(stmt).scalars().all())
+
+
+def list_visited_playground_ids(db: Session, user_id: uuid.UUID) -> set[uuid.UUID]:
+    """사용자가 GPS 체크인('왔다감')한 놀이터 id 집합"""
+    stmt = select(PlaygroundVisit.playground_id).where(PlaygroundVisit.user_id == user_id)
+    return set(db.execute(stmt).scalars().all())
+
+
+def create_visit(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID) -> PlaygroundVisit:
+    """이미 체크인한 놀이터면 기존 행을 그대로 반환한다 (idempotent)."""
+    existing = db.execute(
+        select(PlaygroundVisit).where(
+            PlaygroundVisit.playground_id == playground_id,
+            PlaygroundVisit.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+    visit = PlaygroundVisit(playground_id=playground_id, user_id=user_id)
+    db.add(visit)
+    db.commit()
+    db.refresh(visit)
+    return visit
+
+
+def get_visitor_ranking(db: Session, limit: int) -> list[tuple[str, int]]:
+    """놀이터 체크인(왔다감) 개수 기준 랭킹 (닉네임, 방문한 놀이터 수)"""
+    count_col = func.count(PlaygroundVisit.playground_id.distinct())
+    stmt = (
+        select(User.nickname, count_col.label("count"))
+        .join(PlaygroundVisit, PlaygroundVisit.user_id == User.id)
+        .group_by(User.id, User.nickname)
+        .order_by(count_col.desc())
+        .limit(limit)
+    )
+    return [(row.nickname, row.count) for row in db.execute(stmt).all()]
 
 
 def list_feed(db: Session, limit: int, offset: int) -> list[PlaygroundComment]:

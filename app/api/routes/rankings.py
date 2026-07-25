@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.crud import social as social_crud
 from app.models.playground import Playground
 from app.models.user import User
 from app.schemas.ranking import ReporterRankingItem
@@ -25,4 +26,14 @@ def top_reporters(limit: int = 10, db: Session = Depends(get_db)):
     return [
         ReporterRankingItem(rank=i + 1, nickname=row.nickname, count=row.count)
         for i, row in enumerate(rows)
+    ]
+
+
+@router.get("/visitors", response_model=list[ReporterRankingItem])
+def top_visitors(limit: int = 10, db: Session = Depends(get_db)):
+    """놀이터 GPS 체크인('왔다감') 개수 기준 랭킹 (실시간 집계)"""
+    rows = social_crud.get_visitor_ranking(db, limit)
+    return [
+        ReporterRankingItem(rank=i + 1, nickname=nickname, count=count)
+        for i, (nickname, count) in enumerate(rows)
     ]
