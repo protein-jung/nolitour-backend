@@ -10,7 +10,7 @@ from app.core.storage import get_storage_backend
 from app.crud import playground as crud
 from app.crud import social as social_crud
 from app.models.playground import AgeGroup, EquipmentType, PlaygroundImage
-from app.models.social import PlaygroundComment
+from app.models.social import CommentReply, PlaygroundComment
 from app.models.user import User
 from app.schemas.playground import (
     PlaygroundCreate,
@@ -19,7 +19,14 @@ from app.schemas.playground import (
     VisitCheckIn,
     VisitResult,
 )
-from app.schemas.social import CommentCreate, CommentImageOut, CommentOut, LikeStatus
+from app.schemas.social import (
+    CommentCreate,
+    CommentImageOut,
+    CommentOut,
+    CommentReplyCreate,
+    CommentReplyOut,
+    LikeStatus,
+)
 
 VISIT_RADIUS_M = 300
 
@@ -37,6 +44,16 @@ def _comment_out(comment: PlaygroundComment) -> CommentOut:
         author_nickname=comment.author.nickname,
         author_id=comment.user_id,
         images=list(comment.images),
+    )
+
+
+def _reply_out(reply: CommentReply) -> CommentReplyOut:
+    return CommentReplyOut(
+        id=reply.id,
+        content=reply.content,
+        created_at=reply.created_at,
+        author_nickname=reply.author.nickname,
+        author_id=reply.user_id,
     )
 
 
@@ -249,6 +266,82 @@ def upload_comment_image(
 
     image_url = get_storage_backend().save(file, folder=f"comments/{comment_id}")
     return social_crud.add_comment_image(db, comment_id, image_url)
+
+
+@router.post(
+    "/{playground_id}/comments/{comment_id}/like", response_model=LikeStatus, status_code=201
+)
+def like_comment(
+    playground_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """다른 사람의 후기(피드 게시물)에 좋아요를 남긴다."""
+    comment = social_crud.get_comment(db, comment_id)
+    if comment is None or comment.playground_id != playground_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    social_crud.like_comment(db, comment_id, current_user.id)
+    like_count, liked_by_me = social_crud.get_comment_like_status(db, comment_id, current_user.id)
+    return LikeStatus(like_count=like_count, liked_by_me=liked_by_me)
+
+
+@router.delete("/{playground_id}/comments/{comment_id}/like", response_model=LikeStatus)
+def unlike_comment(
+    playground_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    comment = social_crud.get_comment(db, comment_id)
+    if comment is None or comment.playground_id != playground_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    social_crud.unlike_comment(db, comment_id, current_user.id)
+    like_count, liked_by_me = social_crud.get_comment_like_status(db, comment_id, current_user.id)
+    return LikeStatus(like_count=like_count, liked_by_me=liked_by_me)
+
+
+@router.get("/{playground_id}/comments/{comment_id}/replies", response_model=list[CommentReplyOut])
+def get_comment_replies(playground_id: uuid.UUID, comment_id: uuid.UUID, db: Session = Depends(get_db)):
+    comment = social_crud.get_comment(db, comment_id)
+    if comment is None or comment.playground_id != playground_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    replies = social_crud.list_comment_replies(db, comment_id)
+    return [_reply_out(r) for r in replies]
+
+
+@router.post(
+    "/{playground_id}/comments/{comment_id}/replies", response_model=CommentReplyOut, status_code=201
+)
+def post_comment_reply(
+    playground_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    data: CommentReplyCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """다른 사람의 후기(피드 게시물)에 답글을 남긴다."""
+    comment = social_crud.get_comment(db, comment_id)
+    if comment is None or comment.playground_id != playground_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    reply = social_crud.create_comment_reply(db, comment_id, current_user.id, data.content)
+    return _reply_out(reply)
+
+
+@router.delete("/{playground_id}/comments/{comment_id}/replies/{reply_id}", status_code=204)
+def remove_comment_reply(
+    playground_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    reply_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    reply = social_crud.get_comment_reply(db, reply_id)
+    if reply is None or reply.comment_id != comment_id:
+        raise HTTPException(status_code=404, detail="Reply not found")
+    if reply.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="본인 답글만 삭제할 수 있습니다.")
+    social_crud.delete_comment_reply(db, reply)
 
 
 @router.delete("/{playground_id}/comments/{comment_id}", status_code=204)

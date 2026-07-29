@@ -86,6 +86,44 @@ class PlaygroundComment(Base):
     )
 
 
+class CommentLike(Base):
+    """댓글·후기(피드 게시물)에 대한 좋아요"""
+
+    __tablename__ = "comment_likes"
+    __table_args__ = (UniqueConstraint("comment_id", "user_id", name="uq_comment_like"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("playground_comments.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class CommentReply(Base):
+    """댓글·후기(피드 게시물)에 대한 답글"""
+
+    __tablename__ = "comment_replies"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("playground_comments.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    author: Mapped["User"] = relationship()  # noqa: F821
+
+
 class PlaygroundCommentImage(Base):
     __tablename__ = "playground_comment_images"
 

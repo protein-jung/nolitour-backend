@@ -26,3 +26,7 @@ class FeedItem(BaseModel):
     playground_address: str
     playground_latitude: float
     playground_longitude: float
+
+    like_count: int = 0
+    liked_by_me: bool = False
+    reply_count: int = 0

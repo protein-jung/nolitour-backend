@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.playground import AgeGroup, Playground
 from app.models.social import (
+    CommentLike,
+    CommentReply,
     PlaygroundComment,
     PlaygroundCommentImage,
     PlaygroundLike,
@@ -189,3 +191,96 @@ def list_feed(
     if author_id is not None:
         stmt = stmt.where(PlaygroundComment.user_id == author_id)
     return list(db.execute(stmt).scalars().all())
+
+
+def get_comment_like_status(db: Session, comment_id: uuid.UUID, user_id: uuid.UUID | None) -> tuple[int, bool]:
+    count = db.execute(
+        select(func.count()).select_from(CommentLike).where(CommentLike.comment_id == comment_id)
+    ).scalar_one()
+    liked = False
+    if user_id is not None:
+        liked = (
+            db.execute(
+                select(CommentLike).where(
+                    CommentLike.comment_id == comment_id, CommentLike.user_id == user_id
+                )
+            ).scalar_one_or_none()
+            is not None
+        )
+    return count, liked
+
+
+def like_comment(db: Session, comment_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    existing = db.execute(
+        select(CommentLike).where(CommentLike.comment_id == comment_id, CommentLike.user_id == user_id)
+    ).scalar_one_or_none()
+    if existing:
+        return
+    db.add(CommentLike(comment_id=comment_id, user_id=user_id))
+    db.commit()
+
+
+def unlike_comment(db: Session, comment_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    existing = db.execute(
+        select(CommentLike).where(CommentLike.comment_id == comment_id, CommentLike.user_id == user_id)
+    ).scalar_one_or_none()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+
+def list_comment_replies(db: Session, comment_id: uuid.UUID) -> list[CommentReply]:
+    stmt = (
+        select(CommentReply)
+        .where(CommentReply.comment_id == comment_id)
+        .order_by(CommentReply.created_at.asc())
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def create_comment_reply(db: Session, comment_id: uuid.UUID, user_id: uuid.UUID, content: str) -> CommentReply:
+    reply = CommentReply(comment_id=comment_id, user_id=user_id, content=content)
+    db.add(reply)
+    db.commit()
+    db.refresh(reply)
+    return reply
+
+
+def get_comment_reply(db: Session, reply_id: uuid.UUID) -> CommentReply | None:
+    return db.get(CommentReply, reply_id)
+
+
+def delete_comment_reply(db: Session, reply: CommentReply) -> None:
+    db.delete(reply)
+    db.commit()
+
+
+def get_comment_like_counts(db: Session, comment_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not comment_ids:
+        return {}
+    stmt = (
+        select(CommentLike.comment_id, func.count().label("count"))
+        .where(CommentLike.comment_id.in_(comment_ids))
+        .group_by(CommentLike.comment_id)
+    )
+    return {row.comment_id: row.count for row in db.execute(stmt).all()}
+
+
+def get_comment_reply_counts(db: Session, comment_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not comment_ids:
+        return {}
+    stmt = (
+        select(CommentReply.comment_id, func.count().label("count"))
+        .where(CommentReply.comment_id.in_(comment_ids))
+        .group_by(CommentReply.comment_id)
+    )
+    return {row.comment_id: row.count for row in db.execute(stmt).all()}
+
+
+def list_liked_comment_ids(db: Session, user_id: uuid.UUID, comment_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    if not comment_ids:
+        return set()
+    stmt = select(CommentLike.comment_id).where(
+        CommentLike.user_id == user_id, CommentLike.comment_id.in_(comment_ids)
+    )
+    return set(db.execute(stmt).scalars().all())

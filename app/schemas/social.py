@@ -53,3 +53,25 @@ class CommentOut(BaseModel):
 class LikeStatus(BaseModel):
     like_count: int
     liked_by_me: bool
+
+
+class CommentReplyCreate(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        v = v.strip()
+        if not (1 <= len(v) <= 500):
+            raise ValueError("답글은 1~500자여야 합니다.")
+        return v
+
+
+class CommentReplyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    content: str
+    created_at: datetime
+    author_nickname: str
+    author_id: uuid.UUID
