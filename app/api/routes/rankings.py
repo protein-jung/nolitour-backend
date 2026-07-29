@@ -16,7 +16,7 @@ def top_reporters(limit: int = 10, db: Session = Depends(get_db)):
     """놀이터 제보 개수 기준 제보왕 랭킹 (실시간 집계)"""
     count_col = func.count(Playground.id)
     stmt = (
-        select(User.nickname, count_col.label("count"))
+        select(User.id, User.nickname, count_col.label("count"))
         .join(Playground, Playground.submitted_by_id == User.id)
         .group_by(User.id, User.nickname)
         .order_by(count_col.desc())
@@ -24,7 +24,7 @@ def top_reporters(limit: int = 10, db: Session = Depends(get_db)):
     )
     rows = db.execute(stmt).all()
     return [
-        ReporterRankingItem(rank=i + 1, nickname=row.nickname, count=row.count)
+        ReporterRankingItem(rank=i + 1, user_id=row.id, nickname=row.nickname, count=row.count)
         for i, row in enumerate(rows)
     ]
 
@@ -34,6 +34,6 @@ def top_visitors(limit: int = 10, db: Session = Depends(get_db)):
     """놀이터 GPS 체크인('왔다감') 개수 기준 랭킹 (실시간 집계)"""
     rows = social_crud.get_visitor_ranking(db, limit)
     return [
-        ReporterRankingItem(rank=i + 1, nickname=nickname, count=count)
-        for i, (nickname, count) in enumerate(rows)
+        ReporterRankingItem(rank=i + 1, user_id=user_id, nickname=nickname, count=count)
+        for i, (user_id, nickname, count) in enumerate(rows)
     ]

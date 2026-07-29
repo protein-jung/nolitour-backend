@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -9,9 +11,14 @@ router = APIRouter(prefix="/feed", tags=["feed"])
 
 
 @router.get("", response_model=list[FeedItem])
-def get_feed(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
-    """전체 놀이터의 댓글·후기를 최신순으로 모아 보여주는 피드"""
-    comments = social_crud.list_feed(db, limit=limit, offset=offset)
+def get_feed(
+    limit: int = 20,
+    offset: int = 0,
+    author_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+):
+    """전체 놀이터의 댓글·후기를 최신순으로 모아 보여주는 피드. author_id 지정 시 해당 사용자 글만."""
+    comments = social_crud.list_feed(db, limit=limit, offset=offset, author_id=author_id)
     return [
         FeedItem(
             id=c.id,

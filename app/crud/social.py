@@ -168,25 +168,24 @@ def create_visit(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID) -> P
     return visit
 
 
-def get_visitor_ranking(db: Session, limit: int) -> list[tuple[str, int]]:
-    """놀이터 체크인(왔다감) 개수 기준 랭킹 (닉네임, 방문한 놀이터 수)"""
+def get_visitor_ranking(db: Session, limit: int) -> list[tuple[uuid.UUID, str, int]]:
+    """놀이터 체크인(왔다감) 개수 기준 랭킹 (사용자 id, 닉네임, 방문한 놀이터 수)"""
     count_col = func.count(PlaygroundVisit.playground_id.distinct())
     stmt = (
-        select(User.nickname, count_col.label("count"))
+        select(User.id, User.nickname, count_col.label("count"))
         .join(PlaygroundVisit, PlaygroundVisit.user_id == User.id)
         .group_by(User.id, User.nickname)
         .order_by(count_col.desc())
         .limit(limit)
     )
-    return [(row.nickname, row.count) for row in db.execute(stmt).all()]
+    return [(row.id, row.nickname, row.count) for row in db.execute(stmt).all()]
 
 
-def list_feed(db: Session, limit: int, offset: int) -> list[PlaygroundComment]:
-    """전체 놀이터의 댓글·후기를 최신순으로 반환한다 (피드용)."""
-    stmt = (
-        select(PlaygroundComment)
-        .order_by(PlaygroundComment.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+def list_feed(
+    db: Session, limit: int, offset: int, author_id: uuid.UUID | None = None
+) -> list[PlaygroundComment]:
+    """전체 놀이터의 댓글·후기를 최신순으로 반환한다 (피드용). author_id 지정 시 해당 사용자 글만."""
+    stmt = select(PlaygroundComment).order_by(PlaygroundComment.created_at.desc()).limit(limit).offset(offset)
+    if author_id is not None:
+        stmt = stmt.where(PlaygroundComment.user_id == author_id)
     return list(db.execute(stmt).scalars().all())
