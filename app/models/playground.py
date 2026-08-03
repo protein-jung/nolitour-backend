@@ -4,10 +4,13 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
 )
@@ -101,8 +104,119 @@ class EquipmentType(str, enum.Enum):
     WATER_PLAY = "water_play"  # 물놀이
 
 
+class ConditionStatus(str, enum.Enum):
+    """관리 상태"""
+
+    VERY_CLEAN = "very_clean"  # 매우 깨끗함
+    AVERAGE = "average"  # 보통
+    NEEDS_CARE = "needs_care"  # 관리 필요
+
+
+class PlaygroundSize(str, enum.Enum):
+    """규모"""
+
+    SMALL = "small"  # 소형
+    MEDIUM = "medium"  # 중형
+    LARGE = "large"  # 대형
+
+
+class PlayDuration(str, enum.Enum):
+    """예상 놀이시간"""
+
+    MIN_30 = "min_30"  # 30분
+    HOUR_1 = "hour_1"  # 1시간
+    HOUR_2_PLUS = "hour_2_plus"  # 2시간 이상
+
+
+class NatureFeature(str, enum.Enum):
+    """자연친화 특징 (복수 선택 가능)"""
+
+    MANY_TREES = "many_trees"  # 나무 많음
+    SHADY = "shady"  # 그늘 많음
+    IN_FOREST = "in_forest"  # 숲 속
+    IN_PARK = "in_park"  # 공원 안
+
+
+class PetPolicy(str, enum.Enum):
+    """반려동물 출입"""
+
+    ALLOWED = "allowed"  # 반려견 출입 가능
+    NOT_ALLOWED = "not_allowed"  # 불가
+
+
+class NearbyFacility(str, enum.Enum):
+    """주변 시설 (복수 선택 가능)"""
+
+    CONVENIENCE_STORE = "convenience_store"  # 편의점
+    CAFE = "cafe"  # 카페
+    RESTROOM = "restroom"  # 화장실
+    PHARMACY = "pharmacy"  # 약국
+    HOSPITAL = "hospital"  # 병원
+    PARKING = "parking"  # 주차장
+
+
+class SmokingStatus(str, enum.Enum):
+    """흡연 관련"""
+
+    MANY_SMOKERS = "many_smokers"  # 흡연자 많음
+    NO_SMOKING_ZONE = "no_smoking_zone"  # 금연구역
+
+
+class WheeledAccessType(str, enum.Enum):
+    """자전거·킥보드 (복수 선택 가능)"""
+
+    KICKBOARD = "kickboard"  # 킥보드 가능
+    BICYCLE = "bicycle"  # 자전거 가능
+
+
+class AccessLevel(str, enum.Enum):
+    """접근성 등급 (유모차 등)"""
+
+    EASY = "easy"  # 쉬움
+    MODERATE = "moderate"  # 보통
+    DIFFICULT = "difficult"  # 어려움
+
+
+class RoadSafetyLevel(str, enum.Enum):
+    """도로 인접 안전도"""
+
+    VERY_SAFE = "very_safe"  # 매우 안전
+    MODERATE = "moderate"  # 보통
+    DANGEROUS = "dangerous"  # 위험
+
+
+class MoodTag(str, enum.Enum):
+    """놀이터 분위기 태그 (복수 선택 가능)"""
+
+    QUIET = "quiet"  # 조용한
+    ACTIVE = "active"  # 활동적인
+    PHOTOGENIC = "photogenic"  # 사진 찍기 좋은
+    SPACIOUS = "spacious"  # 넓은
+    NEWLY_BUILT = "newly_built"  # 신설
+    WELL_MAINTAINED = "well_maintained"  # 관리 잘됨
+    HIDDEN_GEM = "hidden_gem"  # 숨은 명소
+    RAINY_DAY_OK = "rainy_day_ok"  # 비 오는 날도 가능
+    SUMMER_PICK = "summer_pick"  # 여름 추천
+    WINTER_PICK = "winter_pick"  # 겨울 추천
+    STROLLER_FRIENDLY = "stroller_friendly"  # 유모차 추천
+    FIRST_PLAYGROUND = "first_playground"  # 첫 놀이터
+    DATE_SPOT = "date_spot"  # 데이트 가능
+    FOREST_VIBE = "forest_vibe"  # 숲속
+    LOTS_TO_DO = "lots_to_do"  # 놀거리 많음
+
+
 class Playground(Base):
     __tablename__ = "playgrounds"
+    __table_args__ = (
+        CheckConstraint(
+            "recommended_age IS NULL OR (recommended_age BETWEEN 0 AND 15)",
+            name="ck_playground_recommended_age",
+        ),
+        CheckConstraint(
+            "recommend_rating IS NULL OR (recommend_rating BETWEEN 1 AND 5)",
+            name="ck_playground_recommend_rating",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -150,6 +264,53 @@ class Playground(Base):
     equipment: Mapped[list[EquipmentType] | None] = mapped_column(
         ARRAY(Enum(EquipmentType, name="equipment_type")), nullable=True
     )
+
+    # 관리 상태 · 규모 · 놀이시간 · 추천
+    condition_status: Mapped[ConditionStatus | None] = mapped_column(
+        Enum(ConditionStatus, name="condition_status"), nullable=True
+    )
+    size: Mapped[PlaygroundSize | None] = mapped_column(
+        Enum(PlaygroundSize, name="playground_size"), nullable=True
+    )
+    play_duration: Mapped[PlayDuration | None] = mapped_column(
+        Enum(PlayDuration, name="play_duration"), nullable=True
+    )
+    recommended_age: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)  # 가장 추천하는 나이(세)
+    recommend_rating: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)  # 1~5, 부모 추천도
+
+    # 자연·반려동물·운영기간
+    nature_features: Mapped[list[NatureFeature] | None] = mapped_column(
+        ARRAY(Enum(NatureFeature, name="nature_feature")), nullable=True
+    )
+    operating_season: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 예: "6월~8월"
+    pet_policy: Mapped[PetPolicy | None] = mapped_column(
+        Enum(PetPolicy, name="pet_policy"), nullable=True
+    )
+
+    # 주변 시설 · 흡연 · 이동수단 · 접근성 · 안전
+    nearby_facilities: Mapped[list[NearbyFacility] | None] = mapped_column(
+        ARRAY(Enum(NearbyFacility, name="nearby_facility")), nullable=True
+    )
+    smoking_status: Mapped[SmokingStatus | None] = mapped_column(
+        Enum(SmokingStatus, name="smoking_status"), nullable=True
+    )
+    wheeled_access: Mapped[list[WheeledAccessType] | None] = mapped_column(
+        ARRAY(Enum(WheeledAccessType, name="wheeled_access_type")), nullable=True
+    )
+    stroller_access_level: Mapped[AccessLevel | None] = mapped_column(
+        Enum(AccessLevel, name="access_level"), nullable=True
+    )
+    road_safety: Mapped[RoadSafetyLevel | None] = mapped_column(
+        Enum(RoadSafetyLevel, name="road_safety_level"), nullable=True
+    )
+
+    # 분위기 태그
+    mood_tags: Mapped[list[MoodTag] | None] = mapped_column(
+        ARRAY(Enum(MoodTag, name="mood_tag")), nullable=True
+    )
+
+    # 운영 중 자동으로 쌓이는 데이터
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     source: Mapped[PlaygroundSource] = mapped_column(
         Enum(PlaygroundSource, name="playground_source"),

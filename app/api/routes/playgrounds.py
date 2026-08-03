@@ -26,6 +26,7 @@ from app.schemas.social import (
     CommentReplyCreate,
     CommentReplyOut,
     LikeStatus,
+    SaveStatus,
 )
 
 VISIT_RADIUS_M = 300
@@ -114,7 +115,12 @@ def get_playground(
     if playground is None:
         raise HTTPException(status_code=404, detail="Playground not found")
 
+    crud.increment_view_count(db, playground)
+
     like_count, liked_by_me = social_crud.get_like_status(
+        db, playground_id, current_user.id if current_user else None
+    )
+    save_count, saved_by_me = social_crud.get_save_status(
         db, playground_id, current_user.id if current_user else None
     )
     comment_count = len(social_crud.list_comments(db, playground_id))
@@ -123,6 +129,8 @@ def get_playground(
     out = PlaygroundOut.model_validate(playground)
     out.like_count = like_count
     out.liked_by_me = liked_by_me
+    out.save_count = save_count
+    out.saved_by_me = saved_by_me
     out.comment_count = comment_count
     out.average_rating = average_rating
     out.rating_count = rating_count
@@ -191,6 +199,33 @@ def unlike_playground(
     social_crud.unlike_playground(db, playground_id, current_user.id)
     like_count, liked_by_me = social_crud.get_like_status(db, playground_id, current_user.id)
     return LikeStatus(like_count=like_count, liked_by_me=liked_by_me)
+
+
+@router.post("/{playground_id}/save", response_model=SaveStatus, status_code=201)
+def save_playground(
+    playground_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """놀이터를 저장(북마크)한다. 좋아요와 별개로 나중에 다시 보기 위한 용도."""
+    if crud.get_playground(db, playground_id) is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+    social_crud.save_playground(db, playground_id, current_user.id)
+    save_count, saved_by_me = social_crud.get_save_status(db, playground_id, current_user.id)
+    return SaveStatus(save_count=save_count, saved_by_me=saved_by_me)
+
+
+@router.delete("/{playground_id}/save", response_model=SaveStatus)
+def unsave_playground(
+    playground_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if crud.get_playground(db, playground_id) is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+    social_crud.unsave_playground(db, playground_id, current_user.id)
+    save_count, saved_by_me = social_crud.get_save_status(db, playground_id, current_user.id)
+    return SaveStatus(save_count=save_count, saved_by_me=saved_by_me)
 
 
 @router.post("/{playground_id}/visit", response_model=VisitResult, status_code=201)

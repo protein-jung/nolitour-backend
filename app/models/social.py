@@ -34,6 +34,24 @@ class PlaygroundLike(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class PlaygroundSave(Base):
+    """놀이터 저장(북마크). 좋아요와 별개로 '나중에 다시 보기' 용도."""
+
+    __tablename__ = "playground_saves"
+    __table_args__ = (UniqueConstraint("playground_id", "user_id", name="uq_playground_save"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    playground_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("playgrounds.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class PlaygroundVisit(Base):
     """GPS 기반 '왔다감' 체크인. 같은 사용자가 같은 놀이터를 여러 번 체크인해도 한 행만 유지한다."""
 

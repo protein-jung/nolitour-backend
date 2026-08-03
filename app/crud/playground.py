@@ -19,6 +19,11 @@ def get_playground(db: Session, playground_id: uuid.UUID) -> Playground | None:
     return db.get(Playground, playground_id)
 
 
+def increment_view_count(db: Session, playground: Playground) -> None:
+    playground.view_count += 1
+    db.commit()
+
+
 def list_playgrounds(
     db: Session,
     *,

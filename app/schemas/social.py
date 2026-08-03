@@ -55,6 +55,11 @@ class LikeStatus(BaseModel):
     liked_by_me: bool
 
 
+class SaveStatus(BaseModel):
+    save_count: int
+    saved_by_me: bool
+
+
 class CommentReplyCreate(BaseModel):
     content: str
 

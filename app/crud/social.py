@@ -10,6 +10,7 @@ from app.models.social import (
     PlaygroundComment,
     PlaygroundCommentImage,
     PlaygroundLike,
+    PlaygroundSave,
     PlaygroundVisit,
     RiskTag,
 )
@@ -57,6 +58,59 @@ def unlike_playground(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID)
     if existing:
         db.delete(existing)
         db.commit()
+
+
+def get_save_status(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID | None) -> tuple[int, bool]:
+    count = db.execute(
+        select(func.count()).select_from(PlaygroundSave).where(PlaygroundSave.playground_id == playground_id)
+    ).scalar_one()
+    saved = False
+    if user_id is not None:
+        saved = (
+            db.execute(
+                select(PlaygroundSave).where(
+                    PlaygroundSave.playground_id == playground_id,
+                    PlaygroundSave.user_id == user_id,
+                )
+            ).scalar_one_or_none()
+            is not None
+        )
+    return count, saved
+
+
+def save_playground(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    existing = db.execute(
+        select(PlaygroundSave).where(
+            PlaygroundSave.playground_id == playground_id,
+            PlaygroundSave.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return
+    db.add(PlaygroundSave(playground_id=playground_id, user_id=user_id))
+    db.commit()
+
+
+def unsave_playground(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    existing = db.execute(
+        select(PlaygroundSave).where(
+            PlaygroundSave.playground_id == playground_id,
+            PlaygroundSave.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+
+def list_saved_playgrounds_by_user(db: Session, user_id: uuid.UUID) -> list[Playground]:
+    stmt = (
+        select(Playground)
+        .join(PlaygroundSave, PlaygroundSave.playground_id == Playground.id)
+        .where(PlaygroundSave.user_id == user_id)
+        .order_by(PlaygroundSave.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars().all())
 
 
 def list_comments(db: Session, playground_id: uuid.UUID) -> list[PlaygroundComment]:
