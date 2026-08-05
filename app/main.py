@@ -12,6 +12,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.feed import router as feed_router
 from app.api.routes.playgrounds import router as playgrounds_router
 from app.api.routes.rankings import router as rankings_router
+from app.api.routes.users import router as users_router
 from app.core.config import settings
 from app.core.slack import send_slack_alert
 
@@ -35,6 +36,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(rankings_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(feed_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

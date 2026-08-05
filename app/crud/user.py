@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.models.playground import Playground
+from app.models.social import PlaygroundComment
 from app.models.user import User
 from app.schemas.user import UserCreate
 
@@ -51,6 +52,20 @@ def list_users_for_admin(db: Session) -> list[tuple[User, int]]:
 
 def get_user(db: Session, user_id: uuid.UUID) -> User | None:
     return db.get(User, user_id)
+
+
+def get_public_profile(db: Session, user_id: uuid.UUID) -> tuple[User, int, int] | None:
+    """(사용자, 제보한 놀이터 수, 작성한 후기 수) — 다른 사용자에게 보여줄 공개 프로필용"""
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    playground_count = db.execute(
+        select(func.count()).select_from(Playground).where(Playground.submitted_by_id == user_id)
+    ).scalar_one()
+    comment_count = db.execute(
+        select(func.count()).select_from(PlaygroundComment).where(PlaygroundComment.user_id == user_id)
+    ).scalar_one()
+    return user, playground_count, comment_count
 
 
 def set_user_admin(db: Session, user: User, is_admin: bool) -> User:

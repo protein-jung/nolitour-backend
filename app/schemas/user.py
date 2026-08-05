@@ -50,6 +50,15 @@ class UserOut(BaseModel):
     is_admin: bool
 
 
+class PublicUserOut(BaseModel):
+    """다른 사용자에게 공개되는 최소 프로필 정보 (전화번호·실명 제외)"""
+
+    id: uuid.UUID
+    nickname: str
+    playground_count: int
+    comment_count: int
+
+
 class LoginRequest(BaseModel):
     phone: str
     password: str
