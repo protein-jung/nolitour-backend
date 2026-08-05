@@ -71,10 +71,12 @@ def list_playgrounds(
     has_parking: bool = False,
     has_restroom: bool = False,
     equipment: list[EquipmentType] | None = Query(default=None),
+    sort: str | None = None,
+    limit: int = Query(default=500, le=500),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    """지도 bounding box + 필터 조건으로 놀이터 목록 조회"""
+    """지도 bounding box + 필터 조건으로 놀이터 목록 조회. sort="popular"면 인기 점수순으로 정렬."""
     playgrounds = crud.list_playgrounds(
         db,
         min_lat=min_lat,
@@ -86,14 +88,18 @@ def list_playgrounds(
         has_parking=has_parking,
         has_restroom=has_restroom,
         equipment=equipment,
+        sort=sort,
+        limit=limit,
     )
     reviewed_ids = social_crud.list_reviewed_playground_ids(db, current_user.id) if current_user else set()
     visited_ids = social_crud.list_visited_playground_ids(db, current_user.id) if current_user else set()
+    active_viewer_counts = crud.get_active_viewer_counts(db, [p.id for p in playgrounds])
     result = []
     for p in playgrounds:
         out = PlaygroundOut.model_validate(p)
         out.reviewed_by_me = p.id in reviewed_ids
         out.visited_by_me = p.id in visited_ids
+        out.active_viewers = active_viewer_counts.get(p.id, 0)
         result.append(out)
     return result
 
@@ -117,7 +123,7 @@ def get_playground(
     if playground is None:
         raise HTTPException(status_code=404, detail="Playground not found")
 
-    crud.increment_view_count(db, playground)
+    crud.record_view(db, playground, current_user.id if current_user else None)
 
     like_count, liked_by_me = social_crud.get_like_status(
         db, playground_id, current_user.id if current_user else None
@@ -136,6 +142,7 @@ def get_playground(
     out.comment_count = comment_count
     out.average_rating = average_rating
     out.rating_count = rating_count
+    out.active_viewers = crud.get_active_viewer_counts(db, [playground_id]).get(playground_id, 0)
     if current_user:
         out.reviewed_by_me = playground_id in social_crud.list_reviewed_playground_ids(db, current_user.id)
         out.visited_by_me = playground_id in social_crud.list_visited_playground_ids(db, current_user.id)
@@ -179,6 +186,7 @@ def update_playground(
     out.comment_count = comment_count
     out.average_rating = average_rating
     out.rating_count = rating_count
+    out.active_viewers = crud.get_active_viewer_counts(db, [playground_id]).get(playground_id, 0)
     out.reviewed_by_me = playground_id in social_crud.list_reviewed_playground_ids(db, current_user.id)
     out.visited_by_me = playground_id in social_crud.list_visited_playground_ids(db, current_user.id)
     return out

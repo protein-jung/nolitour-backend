@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.playground import (
@@ -13,17 +14,74 @@ from app.models.playground import (
     RestroomType,
     ShadeLevel,
 )
-from app.models.social import PlaygroundEditLog
+from app.models.social import PlaygroundComment, PlaygroundEditLog, PlaygroundLike, PlaygroundSave, PlaygroundView
 from app.schemas.playground import PlaygroundCreate, PlaygroundUpdate
+
+ACTIVE_VIEWER_WINDOW_MINUTES = 10
+
+# 인기 점수 가중치: 저장 > 좋아요 > 평균 별점(0~5를 10배해 최대 50점) > 조회수
+LIKE_WEIGHT = 3
+SAVE_WEIGHT = 4
+RATING_WEIGHT = 10
+
+
+def _popularity_score_expr():
+    """좋아요·저장·조회수·평균 별점을 가중합한 인기 점수 SQL 표현식.
+    order_by에만 쓸 때는 서브쿼리를 select 목록에 넣지 않아도 된다."""
+    like_sq = (
+        select(PlaygroundLike.playground_id, func.count().label("count"))
+        .group_by(PlaygroundLike.playground_id)
+        .subquery()
+    )
+    save_sq = (
+        select(PlaygroundSave.playground_id, func.count().label("count"))
+        .group_by(PlaygroundSave.playground_id)
+        .subquery()
+    )
+    rating_sq = (
+        select(PlaygroundComment.playground_id, func.avg(PlaygroundComment.rating).label("avg_rating"))
+        .where(PlaygroundComment.rating.isnot(None))
+        .group_by(PlaygroundComment.playground_id)
+        .subquery()
+    )
+    score_expr = (
+        func.coalesce(like_sq.c.count, 0) * LIKE_WEIGHT
+        + func.coalesce(save_sq.c.count, 0) * SAVE_WEIGHT
+        + Playground.view_count
+        + func.coalesce(rating_sq.c.avg_rating, 0) * RATING_WEIGHT
+    )
+    joins = [
+        (like_sq, like_sq.c.playground_id == Playground.id),
+        (save_sq, save_sq.c.playground_id == Playground.id),
+        (rating_sq, rating_sq.c.playground_id == Playground.id),
+    ]
+    return score_expr, joins
 
 
 def get_playground(db: Session, playground_id: uuid.UUID) -> Playground | None:
     return db.get(Playground, playground_id)
 
 
-def increment_view_count(db: Session, playground: Playground) -> None:
+def record_view(db: Session, playground: Playground, viewer_id: uuid.UUID | None) -> None:
+    """상세 조회 시 카운터를 올리고, '지금 보는 중' 근사치를 위한 조회 기록도 남긴다."""
     playground.view_count += 1
+    db.add(PlaygroundView(playground_id=playground.id, viewer_id=viewer_id))
     db.commit()
+
+
+def get_active_viewer_counts(
+    db: Session, playground_ids: list[uuid.UUID], *, window_minutes: int = ACTIVE_VIEWER_WINDOW_MINUTES
+) -> dict[uuid.UUID, int]:
+    """최근 N분 내 조회 기록 수를 놀이터별로 집계해 '지금 보는 중' 인원수의 근사치로 사용한다."""
+    if not playground_ids:
+        return {}
+    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+    stmt = (
+        select(PlaygroundView.playground_id, func.count().label("count"))
+        .where(PlaygroundView.playground_id.in_(playground_ids), PlaygroundView.viewed_at >= cutoff)
+        .group_by(PlaygroundView.playground_id)
+    )
+    return {row.playground_id: row.count for row in db.execute(stmt).all()}
 
 
 def list_playgrounds(
@@ -38,6 +96,7 @@ def list_playgrounds(
     has_parking: bool = False,
     has_restroom: bool = False,
     equipment: list[EquipmentType] | None = None,
+    sort: str | None = None,
     limit: int = 500,
 ) -> list[Playground]:
     stmt = select(Playground)
@@ -61,8 +120,23 @@ def list_playgrounds(
         )
     if equipment:
         stmt = stmt.where(Playground.equipment.overlap(equipment))
+    if sort == "popular":
+        score_expr, joins = _popularity_score_expr()
+        for target, on_clause in joins:
+            stmt = stmt.outerjoin(target, on_clause)
+        stmt = stmt.order_by(score_expr.desc())
     stmt = stmt.limit(limit)
     return list(db.execute(stmt).scalars().all())
+
+
+def get_popular_playgrounds(db: Session, limit: int = 10) -> list[tuple[Playground, float]]:
+    """인기 점수 상위 놀이터 목록. (놀이터, 점수) 튜플로 반환한다 (인기 놀이터 랭킹 페이지용)."""
+    score_expr, joins = _popularity_score_expr()
+    stmt = select(Playground, score_expr.label("score"))
+    for target, on_clause in joins:
+        stmt = stmt.outerjoin(target, on_clause)
+    stmt = stmt.order_by(score_expr.desc()).limit(limit)
+    return [(row[0], float(row[1])) for row in db.execute(stmt).all()]
 
 
 def list_playgrounds_by_submitter(db: Session, submitted_by_id: uuid.UUID) -> list[Playground]:

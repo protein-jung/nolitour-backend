@@ -133,6 +133,8 @@ class PlaygroundOut(PlaygroundBase):
     view_count: int = 0
     save_count: int | None = None
     saved_by_me: bool | None = None
+    # 최근 N분 내 조회 기록 수 (지금 보는 중인 인원수의 근사치, 목록·단건 조회 모두에서 채워짐)
+    active_viewers: int = 0
 
 
 class VisitCheckIn(BaseModel):

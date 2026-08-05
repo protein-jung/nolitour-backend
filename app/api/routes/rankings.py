@@ -3,10 +3,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.crud import playground as playground_crud
 from app.crud import social as social_crud
 from app.models.playground import Playground
 from app.models.user import User
-from app.schemas.ranking import ReporterRankingItem
+from app.schemas.ranking import PlaygroundRankingItem, ReporterRankingItem
 
 router = APIRouter(prefix="/rankings", tags=["rankings"])
 
@@ -36,4 +37,14 @@ def top_visitors(limit: int = 10, db: Session = Depends(get_db)):
     return [
         ReporterRankingItem(rank=i + 1, user_id=user_id, nickname=nickname, count=count)
         for i, (user_id, nickname, count) in enumerate(rows)
+    ]
+
+
+@router.get("/playgrounds", response_model=list[PlaygroundRankingItem])
+def top_playgrounds(limit: int = 10, db: Session = Depends(get_db)):
+    """좋아요·저장·조회수·평균 별점을 가중합한 인기 점수 기준 놀이터 랭킹"""
+    rows = playground_crud.get_popular_playgrounds(db, limit)
+    return [
+        PlaygroundRankingItem(rank=i + 1, playground_id=p.id, name=p.name, address=p.address, score=round(score, 1))
+        for i, (p, score) in enumerate(rows)
     ]
