@@ -14,8 +14,10 @@ from app.models.social import CommentReply, PlaygroundComment
 from app.models.user import User
 from app.schemas.playground import (
     PlaygroundCreate,
+    PlaygroundEditOut,
     PlaygroundImageOut,
     PlaygroundOut,
+    PlaygroundUpdate,
     VisitCheckIn,
     VisitResult,
 )
@@ -148,6 +150,56 @@ def create_playground(
 ):
     """로그인한 사용자가 직접 놀이터 정보를 제보 (관리자 검수 전까지 is_verified=False)"""
     return crud.create_user_playground(db, data, submitted_by_id=current_user.id)
+
+
+@router.patch("/{playground_id}", response_model=PlaygroundOut)
+def update_playground(
+    playground_id: uuid.UUID,
+    data: PlaygroundUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """로그인한 사용자 누구나 기존 놀이터 정보를 수정할 수 있다 (나무위키 스타일).
+    바뀐 필드는 자동으로 수정 이력에 기록된다."""
+    playground = crud.get_playground(db, playground_id)
+    if playground is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+    playground = crud.update_playground(db, playground, data, editor_id=current_user.id)
+
+    like_count, liked_by_me = social_crud.get_like_status(db, playground_id, current_user.id)
+    save_count, saved_by_me = social_crud.get_save_status(db, playground_id, current_user.id)
+    comment_count = len(social_crud.list_comments(db, playground_id))
+    average_rating, rating_count = social_crud.get_rating_stats(db, playground_id)
+
+    out = PlaygroundOut.model_validate(playground)
+    out.like_count = like_count
+    out.liked_by_me = liked_by_me
+    out.save_count = save_count
+    out.saved_by_me = saved_by_me
+    out.comment_count = comment_count
+    out.average_rating = average_rating
+    out.rating_count = rating_count
+    out.reviewed_by_me = playground_id in social_crud.list_reviewed_playground_ids(db, current_user.id)
+    out.visited_by_me = playground_id in social_crud.list_visited_playground_ids(db, current_user.id)
+    return out
+
+
+@router.get("/{playground_id}/edits", response_model=list[PlaygroundEditOut])
+def get_playground_edits(playground_id: uuid.UUID, db: Session = Depends(get_db)):
+    """놀이터 정보 수정 이력 (누가 무엇을 언제 바꿨는지)"""
+    if crud.get_playground(db, playground_id) is None:
+        raise HTTPException(status_code=404, detail="Playground not found")
+    logs = crud.list_edit_logs(db, playground_id)
+    return [
+        PlaygroundEditOut(
+            id=log.id,
+            editor_id=log.editor_id,
+            editor_nickname=log.editor.nickname,
+            changes=log.changes,
+            created_at=log.created_at,
+        )
+        for log in logs
+    ]
 
 
 @router.post("/{playground_id}/images", response_model=PlaygroundImageOut, status_code=201)

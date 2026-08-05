@@ -103,6 +103,10 @@ class PlaygroundCreate(PlaygroundBase):
     """사용자 직접 입력용 (source는 서버에서 user_submitted로 고정)"""
 
 
+class PlaygroundUpdate(PlaygroundBase):
+    """로그인한 사용자 누구나 기존 놀이터 정보를 수정할 때 사용 (나무위키 스타일). 변경 내역은 자동으로 기록된다."""
+
+
 class PlaygroundOut(PlaygroundBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -139,3 +143,18 @@ class VisitCheckIn(BaseModel):
 class VisitResult(BaseModel):
     visited_by_me: bool
     distance_m: float
+
+
+class FieldChange(BaseModel):
+    old: object | None = None
+    new: object | None = None
+
+
+class PlaygroundEditOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    editor_id: uuid.UUID
+    editor_nickname: str
+    changes: dict[str, FieldChange]
+    created_at: datetime

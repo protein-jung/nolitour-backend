@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, SmallInteger, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -32,6 +32,26 @@ class PlaygroundLike(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class PlaygroundEditLog(Base):
+    """놀이터 정보 수정 이력 (나무위키 스타일 공동 편집). 변경된 필드만 old/new 값으로 기록한다."""
+
+    __tablename__ = "playground_edit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    playground_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("playgrounds.id", ondelete="CASCADE")
+    )
+    editor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # {field: {"old": ..., "new": ...}}
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    editor: Mapped["User"] = relationship()  # noqa: F821
 
 
 class PlaygroundSave(Base):
