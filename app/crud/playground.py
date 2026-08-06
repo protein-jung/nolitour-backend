@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.playground import (
@@ -62,22 +62,31 @@ def get_playground(db: Session, playground_id: uuid.UUID) -> Playground | None:
     return db.get(Playground, playground_id)
 
 
-def record_view(db: Session, playground: Playground, viewer_id: uuid.UUID | None) -> None:
-    """상세 조회 시 카운터를 올리고, '지금 보는 중' 근사치를 위한 조회 기록도 남긴다."""
+def record_view(
+    db: Session, playground: Playground, viewer_id: uuid.UUID | None, viewer_key: str | None = None
+) -> None:
+    """상세 조회 시 카운터를 올리고, '지금 보는 중' 근사치를 위한 조회 기록도 남긴다.
+    viewer_key는 비로그인 사용자를 구분하기 위해 클라이언트가 보내는 익명 ID."""
     playground.view_count += 1
-    db.add(PlaygroundView(playground_id=playground.id, viewer_id=viewer_id))
+    db.add(PlaygroundView(playground_id=playground.id, viewer_id=viewer_id, viewer_key=viewer_key))
     db.commit()
 
 
 def get_active_viewer_counts(
     db: Session, playground_ids: list[uuid.UUID], *, window_minutes: int = ACTIVE_VIEWER_WINDOW_MINUTES
 ) -> dict[uuid.UUID, int]:
-    """최근 N분 내 조회 기록 수를 놀이터별로 집계해 '지금 보는 중' 인원수의 근사치로 사용한다."""
+    """최근 N분 내 놀이터별 '서로 다른' 조회자 수를 집계해 '지금 보는 중' 인원수의 근사치로 사용한다.
+    같은 사람이 여러 번 조회해도 한 명으로만 카운트되도록 viewer_id(로그인) 또는
+    viewer_key(비로그인)로 distinct 처리한다. 둘 다 없는 요청은 집계에서 제외된다."""
     if not playground_ids:
         return {}
     cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+    viewer_identity = func.coalesce(cast(PlaygroundView.viewer_id, String), PlaygroundView.viewer_key)
     stmt = (
-        select(PlaygroundView.playground_id, func.count().label("count"))
+        select(
+            PlaygroundView.playground_id,
+            func.count(func.distinct(viewer_identity)).label("count"),
+        )
         .where(PlaygroundView.playground_id.in_(playground_ids), PlaygroundView.viewed_at >= cutoff)
         .group_by(PlaygroundView.playground_id)
     )

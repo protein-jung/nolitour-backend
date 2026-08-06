@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,13 @@ def get_current_user_optional(
     if not user_id:
         return None
     return db.get(User, uuid.UUID(user_id))
+
+
+def get_viewer_key(x_viewer_key: str | None = Header(None)) -> str | None:
+    """비로그인 사용자를 구분하기 위해 프론트가 보내는 익명 클라이언트 ID (X-Viewer-Key 헤더)."""
+    if x_viewer_key and len(x_viewer_key) <= 64:
+        return x_viewer_key
+    return None
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:

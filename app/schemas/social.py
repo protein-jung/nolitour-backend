@@ -80,3 +80,19 @@ class CommentReplyOut(BaseModel):
     created_at: datetime
     author_nickname: str
     author_id: uuid.UUID
+
+
+class MyVisitOut(BaseModel):
+    id: uuid.UUID
+    playground_id: uuid.UUID
+    playground_name: str
+    created_at: datetime
+
+
+class MyReviewOut(BaseModel):
+    id: uuid.UUID
+    playground_id: uuid.UUID
+    playground_name: str
+    content: str
+    rating: int | None
+    created_at: datetime

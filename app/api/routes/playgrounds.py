@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_current_user_optional
+from app.core.deps import get_current_user, get_current_user_optional, get_viewer_key
 from app.core.geo import haversine_distance_m
 from app.core.storage import get_storage_backend
 from app.crud import playground as crud
@@ -28,6 +28,8 @@ from app.schemas.social import (
     CommentReplyCreate,
     CommentReplyOut,
     LikeStatus,
+    MyReviewOut,
+    MyVisitOut,
     SaveStatus,
 )
 
@@ -113,17 +115,51 @@ def list_my_playgrounds(
     return crud.list_playgrounds_by_submitter(db, current_user.id)
 
 
+@router.get("/mine/visits", response_model=list[MyVisitOut])
+def list_my_visits(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """내가 GPS 체크인('왔다감')한 놀이터 기록 (놀이터캘린더용)"""
+    rows = social_crud.list_visits_by_user(db, current_user.id)
+    return [
+        MyVisitOut(id=v.id, playground_id=v.playground_id, playground_name=name, created_at=v.created_at)
+        for v, name in rows
+    ]
+
+
+@router.get("/mine/reviews", response_model=list[MyReviewOut])
+def list_my_reviews(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """내가 작성한 댓글·후기 목록 (놀이터캘린더용)"""
+    rows = social_crud.list_comments_by_user(db, current_user.id)
+    return [
+        MyReviewOut(
+            id=c.id,
+            playground_id=c.playground_id,
+            playground_name=name,
+            content=c.content,
+            rating=c.rating,
+            created_at=c.created_at,
+        )
+        for c, name in rows
+    ]
+
+
 @router.get("/{playground_id}", response_model=PlaygroundOut)
 def get_playground(
     playground_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
+    viewer_key: str | None = Depends(get_viewer_key),
 ):
     playground = crud.get_playground(db, playground_id)
     if playground is None:
         raise HTTPException(status_code=404, detail="Playground not found")
 
-    crud.record_view(db, playground, current_user.id if current_user else None)
+    crud.record_view(db, playground, current_user.id if current_user else None, viewer_key)
 
     like_count, liked_by_me = social_crud.get_like_status(
         db, playground_id, current_user.id if current_user else None
