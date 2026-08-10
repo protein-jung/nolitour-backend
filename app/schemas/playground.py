@@ -22,6 +22,7 @@ from app.models.playground import (
     RoadSafetyLevel,
     ShadeLevel,
     SmokingStatus,
+    SportsFacility,
     SurfaceType,
     WheeledAccessType,
 )
@@ -61,6 +62,7 @@ class PlaygroundBase(BaseModel):
 
     # 놀이기구
     equipment: list[EquipmentType] | None = None
+    sports_facilities: list[SportsFacility] | None = None
 
     # 관리 상태 · 규모 · 놀이시간 · 추천
     condition_status: ConditionStatus | None = None

@@ -104,6 +104,18 @@ class EquipmentType(str, enum.Enum):
     WATER_PLAY = "water_play"  # 물놀이
 
 
+class SportsFacility(str, enum.Enum):
+    """부가 시설 (놀이터 주변에 함께 있는 운동·편의 시설, 복수 선택 가능)"""
+
+    SOCCER_FIELD = "soccer_field"  # 축구장
+    BASKETBALL_COURT = "basketball_court"  # 농구장
+    BADMINTON_COURT = "badminton_court"  # 배드민턴장
+    VOLLEYBALL_COURT = "volleyball_court"  # 배구장
+    GRASS_FIELD = "grass_field"  # 잔디밭
+    OUTDOOR_GYM = "outdoor_gym"  # 야외 운동기구
+    GATEBALL_COURT = "gateball_court"  # 게이트볼장
+
+
 class ConditionStatus(str, enum.Enum):
     """관리 상태"""
 
@@ -263,6 +275,11 @@ class Playground(Base):
     # 놀이기구
     equipment: Mapped[list[EquipmentType] | None] = mapped_column(
         ARRAY(Enum(EquipmentType, name="equipment_type")), nullable=True
+    )
+
+    # 부가 시설 (축구장·농구장 등 함께 있는 운동 시설)
+    sports_facilities: Mapped[list[SportsFacility] | None] = mapped_column(
+        ARRAY(Enum(SportsFacility, name="sports_facility")), nullable=True
     )
 
     # 관리 상태 · 규모 · 놀이시간 · 추천
