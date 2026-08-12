@@ -86,6 +86,7 @@ class MyVisitOut(BaseModel):
     id: uuid.UUID
     playground_id: uuid.UUID
     playground_name: str
+    playground_image_url: str | None
     created_at: datetime
 
 

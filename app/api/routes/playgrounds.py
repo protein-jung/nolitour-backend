@@ -123,8 +123,14 @@ def list_my_visits(
     """내가 GPS 체크인('왔다감')한 놀이터 기록 (놀이터캘린더용)"""
     rows = social_crud.list_visits_by_user(db, current_user.id)
     return [
-        MyVisitOut(id=v.id, playground_id=v.playground_id, playground_name=name, created_at=v.created_at)
-        for v, name in rows
+        MyVisitOut(
+            id=v.id,
+            playground_id=v.playground_id,
+            playground_name=name,
+            playground_image_url=image_url,
+            created_at=v.created_at,
+        )
+        for v, name, image_url in rows
     ]
 
 

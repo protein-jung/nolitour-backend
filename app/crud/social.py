@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.playground import AgeGroup, Playground
+from app.models.playground import AgeGroup, Playground, PlaygroundImage
 from app.models.social import (
     CommentLike,
     CommentReply,
@@ -207,15 +207,23 @@ def list_visited_playground_ids(db: Session, user_id: uuid.UUID) -> set[uuid.UUI
     return set(db.execute(stmt).scalars().all())
 
 
-def list_visits_by_user(db: Session, user_id: uuid.UUID) -> list[tuple[PlaygroundVisit, str]]:
-    """(체크인 기록, 놀이터 이름) 목록을 최신순으로 반환한다."""
+def list_visits_by_user(db: Session, user_id: uuid.UUID) -> list[tuple[PlaygroundVisit, str, str | None]]:
+    """(체크인 기록, 놀이터 이름, 대표 사진 URL) 목록을 최신순으로 반환한다."""
+    primary_image = (
+        select(PlaygroundImage.image_url)
+        .where(PlaygroundImage.playground_id == Playground.id)
+        .order_by(PlaygroundImage.is_primary.desc(), PlaygroundImage.created_at.asc())
+        .limit(1)
+        .correlate(Playground)
+        .scalar_subquery()
+    )
     stmt = (
-        select(PlaygroundVisit, Playground.name)
+        select(PlaygroundVisit, Playground.name, primary_image)
         .join(Playground, Playground.id == PlaygroundVisit.playground_id)
         .where(PlaygroundVisit.user_id == user_id)
         .order_by(PlaygroundVisit.created_at.desc())
     )
-    return [(row[0], row[1]) for row in db.execute(stmt).all()]
+    return [(row[0], row[1], row[2]) for row in db.execute(stmt).all()]
 
 
 def create_visit(db: Session, playground_id: uuid.UUID, user_id: uuid.UUID) -> PlaygroundVisit:
