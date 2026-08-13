@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.playground import (
     AccessLevel,
+    AdmissionFeeType,
     AgeGroup,
     ConditionStatus,
     EquipmentType,
@@ -48,6 +49,9 @@ class PlaygroundBase(BaseModel):
     operating_hours: str | None = None
     closed_days: str | None = None
     phone: str | None = None
+
+    admission_fee_type: AdmissionFeeType | None = None
+    admission_fee: int | None = None  # 원 단위, 유료일 때만 의미 있음
 
     # 안전 정보
     surface_types: list[SurfaceType] | None = None

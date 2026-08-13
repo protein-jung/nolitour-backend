@@ -6,9 +6,13 @@ from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.playground import (
+    AccessLevel,
+    AdmissionFeeType,
     AgeGroup,
     EquipmentType,
+    FenceType,
     ParkingType,
+    PetPolicy,
     Playground,
     PlaygroundSource,
     RestroomType,
@@ -104,6 +108,11 @@ def list_playgrounds(
     has_shade: bool = False,
     has_parking: bool = False,
     has_restroom: bool = False,
+    is_free: bool = False,
+    has_cctv: bool = False,
+    has_fence: bool = False,
+    stroller_friendly: bool = False,
+    pet_friendly: bool = False,
     equipment: list[EquipmentType] | None = None,
     sort: str | None = None,
     limit: int = 500,
@@ -127,6 +136,16 @@ def list_playgrounds(
         stmt = stmt.where(
             Playground.restroom.in_([RestroomType.AVAILABLE, RestroomType.AVAILABLE_WITH_DIAPER_TABLE])
         )
+    if is_free:
+        stmt = stmt.where(Playground.admission_fee_type == AdmissionFeeType.FREE)
+    if has_cctv:
+        stmt = stmt.where(Playground.has_cctv.is_(True))
+    if has_fence:
+        stmt = stmt.where(Playground.fence.in_([FenceType.FULL, FenceType.PARTIAL]))
+    if stroller_friendly:
+        stmt = stmt.where(Playground.stroller_access_level == AccessLevel.EASY)
+    if pet_friendly:
+        stmt = stmt.where(Playground.pet_policy == PetPolicy.ALLOWED)
     if equipment:
         stmt = stmt.where(Playground.equipment.overlap(equipment))
     if sort == "popular":

@@ -83,6 +83,13 @@ class ParkingType(str, enum.Enum):
     PAID = "paid"  # 유료
 
 
+class AdmissionFeeType(str, enum.Enum):
+    """이용료"""
+
+    FREE = "free"  # 무료
+    PAID = "paid"  # 유료
+
+
 class FenceType(str, enum.Enum):
     """펜스"""
 
@@ -228,6 +235,10 @@ class Playground(Base):
             "recommend_rating IS NULL OR (recommend_rating BETWEEN 1 AND 5)",
             name="ck_playground_recommend_rating",
         ),
+        CheckConstraint(
+            "admission_fee IS NULL OR admission_fee >= 0",
+            name="ck_playground_admission_fee",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -252,6 +263,11 @@ class Playground(Base):
     operating_hours: Mapped[str | None] = mapped_column(String(200), nullable=True)
     closed_days: Mapped[str | None] = mapped_column(String(200), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    admission_fee_type: Mapped[AdmissionFeeType | None] = mapped_column(
+        Enum(AdmissionFeeType, name="admission_fee_type"), nullable=True
+    )
+    admission_fee: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 원 단위, 유료일 때만 의미 있음
 
     # 안전 정보
     surface_types: Mapped[list[SurfaceType] | None] = mapped_column(
